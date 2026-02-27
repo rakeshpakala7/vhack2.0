@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartKart | Autonomous E-Commerce</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header class="navbar">
+        <div class="brand">SmartKart</div>
+        <div class="search-wrap">
+            <input id="searchInput" type="text" placeholder="Search for products, brands and more">
+        </div>
+        <nav class="menu">
+            <button class="menu-btn active" data-view="storeView">Store</button>
+            <button class="menu-btn" data-view="agentView">Agent Console</button>
+            <button id="refreshBtn" class="menu-btn">Refresh</button>
+        </nav>
+        <div class="quick">
+            <span id="modeTag" class="badge">Mode: --</span>
+            <span id="likesCount" class="pill">Like 0</span>
+            <span id="wishCount" class="pill">Wish 0</span>
+            <span id="cartCount" class="pill">Cart 0</span>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section id="storeView" class="view active">
+            <section class="hero">
+                <article class="promo left">
+                    <p>Flash Deal</p>
+                    <h2>Market-aware prices, live competitor response.</h2>
+                    <small>Observe -> Analyze -> Decide -> Execute -> Evaluate -> Adapt</small>
+                </article>
+                <article class="promo right">
+                    <p>Delivery Location</p>
+                    <h3 id="healthState">Checking...</h3>
+                    <small>System health and runtime mode</small>
+                </article>
+            </section>
+
+            <section class="store-grid-wrap">
+                <div class="section-title">
+                    <h3>Best Gadgets & Appliances</h3>
+                </div>
+                <div id="productGrid" class="product-grid"></div>
+            </section>
+        </section>
+
+        <section id="agentView" class="view">
+            <div class="admin-actions">
+                <button id="healthBtn">Check Health</button>
+                <button id="simulateBtn">Simulate Sales</button>
+                <button id="runAgentBtn">Run Agent Loop</button>
+                <button id="reloadSignalsBtn">Reload Panels</button>
+            </div>
+
+            <div class="admin-grid">
+                <article class="panel">
+                    <div class="panel-head"><h4>Business Signals</h4><span>Observe</span></div>
+                    <div id="signalsPanel" class="stack"></div>
+                </article>
+                <article class="panel">
+                    <div class="panel-head"><h4>Competitor Comparison</h4><span>Analyze</span></div>
+                    <div id="competitorPanel" class="stack"></div>
+                </article>
+                <article class="panel">
+                    <div class="panel-head"><h4>Strategy Generation</h4><span>Decide</span></div>
+                    <div id="strategyPanel" class="stack"></div>
+                </article>
+                <article class="panel">
+                    <div class="panel-head"><h4>Execution Log</h4><span>Execute / Evaluate</span></div>
+                    <div id="logPanel" class="stack"></div>
+                </article>
+                <article class="panel wide">
+                    <div class="panel-head"><h4>Learning Memory</h4><span>Adapt</span></div>
+                    <pre id="memoryPanel">No memory yet.</pre>
+                </article>
+            </div>
+        </section>
+
+        <aside class="cart-panel">
+            <div class="panel-head"><h4>Cart Summary</h4><span id="statusTag">Idle</span></div>
+            <div id="cartPanel" class="stack"></div>
+            <button id="checkoutBtn" class="checkout">Simulate Purchase</button>
+            <pre id="output">Ready.</pre>
+        </aside>
+    </main>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
