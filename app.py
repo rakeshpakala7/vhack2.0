@@ -3,25 +3,40 @@ import random
 from flask import Flask, jsonify, render_template, request
 from services.product_service import get_all_products
 from services.sales_service import simulate_sales, get_sales_trend
-from services.agent_service import run_agent
 from db_config import get_connection
 
 app = Flask(__name__)
 
 DEMO_PRODUCTS = [
-    {"id": 1, "name": "Noise Buds Pro", "price": 89.0, "stock": 28, "category": "Audio"},
-    {"id": 2, "name": "Aero Smart Watch X", "price": 149.0, "stock": 19, "category": "Wearables"},
-    {"id": 3, "name": "PowerMax 20K Bank", "price": 59.0, "stock": 42, "category": "Accessories"},
-    {"id": 4, "name": "TrimEdge Groom Kit", "price": 69.0, "stock": 25, "category": "Grooming"},
-    {"id": 5, "name": "Volt Gaming Mouse", "price": 39.0, "stock": 31, "category": "Gaming"},
-    {"id": 6, "name": "AirCool Desk Fan", "price": 45.0, "stock": 15, "category": "Home"},
+    {"id": 1, "name": "Stainless Steel Water Bottle", "price": 699.0, "stock": 44, "category": "Kitchen"},
+    {"id": 2, "name": "Wireless Gaming Mouse", "price": 1499.0, "stock": 26, "category": "Gaming"},
+    {"id": 3, "name": "Portable Power Bank", "price": 1299.0, "stock": 38, "category": "Accessories"},
+    {"id": 4, "name": "LED Desk Lamp", "price": 899.0, "stock": 19, "category": "Home"},
+    {"id": 5, "name": "Wireless Bluetooth Headphones", "price": 2499.0, "stock": 21, "category": "Audio"},
+    {"id": 6, "name": "Smart Fitness Watch", "price": 3299.0, "stock": 14, "category": "Wearables"},
+    {"id": 7, "name": "Running Shoes", "price": 2799.0, "stock": 32, "category": "Fashion"},
+    {"id": 8, "name": "Men's Casual T-Shirt", "price": 799.0, "stock": 55, "category": "Fashion"},
+    {"id": 9, "name": "Kitchen Mixer Grinder", "price": 3699.0, "stock": 12, "category": "Appliances"},
 ]
+REQUESTED_PRODUCT_NAMES = {p["name"] for p in DEMO_PRODUCTS}
+PRODUCT_IMAGE_FILES = {
+    "Stainless Steel Water Bottle": "stainless_steel_water_bottle.svg",
+    "Wireless Gaming Mouse": "wireless_gaming_mouse.svg",
+    "Portable Power Bank": "portable_power_bank.svg",
+    "LED Desk Lamp": "led_desk_lamp.svg",
+    "Wireless Bluetooth Headphones": "wireless_bluetooth_headphones.svg",
+    "Smart Fitness Watch": "smart_fitness_watch.svg",
+    "Running Shoes": "running_shoes.svg",
+    "Men's Casual T-Shirt": "mens_casual_tshirt.svg",
+    "Kitchen Mixer Grinder": "kitchen_mixer_grinder.svg",
+}
 
 UI_STATE = {
     "likes": set(),
     "wishlist": set(),
     "cart": {},
-    "demo_logs": []
+    "demo_logs": [],
+    "pending_decisions": []
 }
 
 
@@ -55,7 +70,10 @@ def _normalize_products(rows):
 
 def _get_products():
     if _db_is_available():
-        return _normalize_products(get_all_products()), "db"
+        db_products = _normalize_products(get_all_products())
+        filtered = [p for p in db_products if p["name"] in REQUESTED_PRODUCT_NAMES]
+        if filtered:
+            return filtered, "db"
     return [dict(p) for p in DEMO_PRODUCTS], "demo"
 
 
@@ -88,8 +106,9 @@ def _demand_for_product(product, source):
     return max(20, min(95, 100 - product["stock"] + ((product["id"] * 11) % 21)))
 
 
-def _product_image_url(product_id):
-    return f"https://picsum.photos/seed/shop-{product_id}/480/320"
+def _product_image_url(product_name, product_id):
+    filename = PRODUCT_IMAGE_FILES.get(str(product_name), f"product_{int(product_id)}.svg")
+    return f"/static/images/{filename}"
 
 
 def _enrich_products(products, source):
@@ -108,7 +127,7 @@ def _enrich_products(products, source):
             "liked": p["id"] in UI_STATE["likes"],
             "wishlisted": p["id"] in UI_STATE["wishlist"],
             "cart_qty": cart_qty,
-            "image_url": _product_image_url(p["id"])
+            "image_url": _product_image_url(p["name"], p["id"])
         })
     return enriched
 
@@ -147,44 +166,116 @@ def _run_demo_agent(products, source):
     for p in products:
         demand = _demand_for_product(p, source)
         competitor = _competitor_price(p["price"], p["id"])
-        action = "no_action"
-        discount = 0.0
-        reason = "Market conditions are balanced."
+        trend = _trend_for_product(p, source)
+        stock = int(p["stock"])
+        price = float(p["price"])
 
-        if p["stock"] > 32 and demand < 45:
-            action = "discount"
-            discount = 12.0
-            reason = "High stock and weak demand detected."
-        elif competitor < p["price"] and demand < 60:
-            action = "discount"
-            discount = 6.0
-            reason = "Competitor undercutting while demand is soft."
-        elif p["stock"] < 8 and demand > 70:
-            reason = "Protecting margin due to low stock and strong demand."
+        action = "decrease_price"
+        action_value = 2.0
+        reason = "Baseline micro-adjustment to keep price movement active."
 
-        before_price = p["price"]
-        after_price = before_price
-        success = False
+        if demand >= 70 and stock <= 15:
+            action = "increase_price"
+            action_value = 8.0
+            reason = "Demand is high and stock is low."
+        elif stock >= 40 and demand <= 45:
+            action = "decrease_price"
+            action_value = 10.0
+            reason = "Stock is high and demand is weak."
+        elif competitor < price and demand < 60:
+            action = "decrease_price"
+            action_value = 6.0
+            reason = "Competitor price is lower while demand is not strong."
+        elif competitor > price and trend == "up" and demand > 68:
+            action = "increase_price"
+            action_value = 4.0
+            reason = "Demand trend is up and competitor is priced higher."
+        elif demand >= 55 or stock <= 20:
+            action = "increase_price"
+            action_value = 3.0
+            reason = "Healthy demand or tighter stock supports a small increase."
 
-        if action == "discount" and discount > 0:
-            after_price = round(before_price * (1 - discount / 100), 2)
-            p["price"] = after_price
-            success = True
+        if action == "increase_price":
+            after_price = round(price * (1 + action_value / 100), 2)
+        else:
+            after_price = round(price * (1 - action_value / 100), 2)
+
+        results.append({
+            "product_id": p["id"],
+            "name": p["name"],
+            "problem": f"demand={demand}, stock={stock}, competitor={competitor}, trend={trend}",
+            "action": action,
+            "action_value": action_value,
+            "reason": reason,
+            "before_price": price,
+            "after_price": after_price,
+            "success": False
+        })
+    return results
+
+
+def _analyze_agent(products, source):
+    decisions = _run_demo_agent(products, source)
+    UI_STATE["pending_decisions"] = decisions
+    return decisions
+
+
+def _apply_agent_decisions(source):
+    decisions = list(UI_STATE["pending_decisions"])
+    if not decisions:
+        return []
+
+    by_id = {p["id"]: p for p in DEMO_PRODUCTS}
+
+    if source == "db":
+        conn = get_connection()
+        cursor = conn.cursor()
+
+    applied = []
+    for decision in decisions:
+        action = decision.get("action", "no_action")
+        product_id = int(decision.get("product_id", 0))
+        after_price = float(decision.get("after_price", 0))
+        success = action in ("increase_price", "decrease_price") and after_price > 0
+
+        if success:
+            if source == "db":
+                cursor.execute("UPDATE products SET price=%s WHERE id=%s", (after_price, product_id))
+            else:
+                target = by_id.get(product_id)
+                if target:
+                    target["price"] = after_price
 
         log = {
-            "product_id": p["id"],
-            "problem": f"demand={demand}, stock={p['stock']}, competitor={competitor}",
-            "action": action,
-            "action_value": discount,
-            "reason": reason,
-            "before_price": before_price,
-            "after_price": after_price,
+            **decision,
             "success": success
         }
-        _record_demo_log(log)
-        results.append(log)
 
-    return results
+        if source == "db":
+            cursor.execute("""
+                INSERT INTO agent_logs
+                (product_id, problem, action, action_value, reason, before_price, after_price, success)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                product_id,
+                decision.get("problem", ""),
+                action,
+                float(decision.get("action_value", 0)),
+                decision.get("reason", ""),
+                float(decision.get("before_price", 0)),
+                after_price,
+                success
+            ))
+
+        _record_demo_log(log)
+        applied.append(log)
+
+    if source == "db":
+        conn.commit()
+        conn.close()
+
+    UI_STATE["pending_decisions"] = []
+    return applied
 
 
 @app.route("/")
@@ -405,12 +496,46 @@ def simulate_purchase():
 @app.route("/run-agent")
 def run():
     products_data, source = _get_products()
-    if source == "db":
-        try:
-            return jsonify(run_agent())
-        except Exception:
-            pass
-    return jsonify(_run_demo_agent(products_data, source))
+    decisions = _analyze_agent(products_data, source)
+    return jsonify({
+        "ok": True,
+        "stage": "analysis",
+        "message": "Analysis completed. Review and apply decisions.",
+        "data": decisions
+    })
+
+
+@app.route("/apply-agent-decisions", methods=["POST"])
+def apply_agent_decisions():
+    _, source = _get_products()
+    try:
+        applied = _apply_agent_decisions(source)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "apply_failed", "message": str(e)}), 500
+
+    if not applied:
+        return jsonify({
+            "ok": False,
+            "error": "no_pending_decisions",
+            "message": "Run agent analysis before applying decisions."
+        }), 400
+
+    return jsonify({
+        "ok": True,
+        "stage": "applied",
+        "message": "Price changes applied successfully.",
+        "data": applied
+    })
+
+
+@app.route("/agent-state")
+def agent_state():
+    pending = UI_STATE.get("pending_decisions", [])
+    return jsonify({
+        "ok": True,
+        "pending_count": len(pending),
+        "has_pending": len(pending) > 0
+    })
 
 
 @app.route("/agent-logs")

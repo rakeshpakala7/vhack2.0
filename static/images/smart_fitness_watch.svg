@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e7fff1"/>
+      <stop offset="100%" stop-color="#caefd9"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <rect x="290" y="60" width="60" height="360" rx="24" fill="#24342d"/>
+  <rect x="240" y="150" width="160" height="180" rx="30" fill="#111a16"/>
+  <rect x="262" y="176" width="116" height="128" rx="16" fill="#2be082"/>
+  <text x="320" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#1c4d33">Fitness Watch</text>
+</svg>

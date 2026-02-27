@@ -14,6 +14,7 @@ const competitorPanel = document.getElementById("competitorPanel");
 const strategyPanel = document.getElementById("strategyPanel");
 const logPanel = document.getElementById("logPanel");
 const memoryPanel = document.getElementById("memoryPanel");
+const applyAgentBtn = document.getElementById("applyAgentBtn");
 
 let storeCache = {
     source: "--",
@@ -32,7 +33,12 @@ function setOutput(data) {
 }
 
 function money(value) {
-    return `$${Number(value || 0).toFixed(2)}`;
+    return Number(value || 0).toLocaleString("en-IN", {
+        style: "currency",
+        currency: "INR",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 }
 
 async function api(path, options = {}) {
@@ -97,8 +103,6 @@ function productCard(product) {
                 <h4>${product.name}</h4>
                 <p class="meta">${product.category} | Stock ${product.stock}</p>
                 <div class="metric"><span>Price</span><strong>${money(product.price)}</strong></div>
-                <div class="metric"><span>Competitor</span><strong>${money(product.competitor_price)}</strong></div>
-                <div class="metric"><span>Demand</span><strong>${product.demand}/100</strong></div>
                 <div class="actions">
                     <button class="btn-small like" data-like="${product.id}">${liked}</button>
                     <button class="btn-small wish" data-wishlist="${product.id}">${wish}</button>
@@ -193,6 +197,11 @@ async function loadStore() {
     renderCart();
 }
 
+async function refreshApplyButtonState() {
+    const res = await api("/agent-state");
+    applyAgentBtn.disabled = !(res.ok && res.data?.has_pending);
+}
+
 function drawList(target, rows, renderer) {
     target.innerHTML = "";
     if (!rows.length) {
@@ -284,17 +293,35 @@ document.getElementById("refreshBtn").addEventListener("click", async () => {
     await loadStore();
     await loadAgentPanels();
     await loadHealth();
+    await refreshApplyButtonState();
 });
 document.getElementById("healthBtn").addEventListener("click", loadHealth);
 document.getElementById("simulateBtn").addEventListener("click", async () => {
     await api("/simulate-sales");
     await loadStore();
     await loadAgentPanels();
+    await refreshApplyButtonState();
 });
 document.getElementById("runAgentBtn").addEventListener("click", async () => {
-    await api("/run-agent");
+    const res = await api("/run-agent");
+    const decisions = res.data?.data || [];
+    applyAgentBtn.disabled = decisions.length === 0;
+    drawList(logPanel, decisions, (x) => `
+        <p><strong>${x.name || `Product ${x.product_id}`}</strong> | ${x.action}</p>
+        <p class="small">${money(x.before_price)} -> ${money(x.after_price)} | ${x.reason || ""}</p>
+    `);
+    memoryPanel.textContent = buildMemory(decisions);
+    await loadStore();
+    await refreshApplyButtonState();
+});
+applyAgentBtn.addEventListener("click", async () => {
+    const res = await api("/apply-agent-decisions", { method: "POST" });
+    if (res.ok) {
+        applyAgentBtn.disabled = true;
+    }
     await loadStore();
     await loadAgentPanels();
+    await refreshApplyButtonState();
 });
 document.getElementById("reloadSignalsBtn").addEventListener("click", loadAgentPanels);
 document.getElementById("checkoutBtn").addEventListener("click", simulateCheckout);
@@ -303,6 +330,7 @@ async function init() {
     await loadHealth();
     await loadStore();
     await loadAgentPanels();
+    await refreshApplyButtonState();
 }
 
 init();
